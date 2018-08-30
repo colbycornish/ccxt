@@ -35,6 +35,7 @@ class kraken (Exchange):
             'countries': ['US'],
             'version': '0',
             'rateLimit': 3000,
+            'certified': True,
             'has': {
                 'createDepositAddress': True,
                 'fetchDepositAddress': True,
@@ -217,6 +218,7 @@ class kraken (Exchange):
                 'EAPI:Rate limit exceeded': DDoSProtection,
                 'EQuery:Unknown asset': ExchangeError,
                 'EGeneral:Internal error': ExchangeNotAvailable,
+                'EGeneral:Temporary lockout': DDoSProtection,
             },
         })
 
@@ -228,13 +230,14 @@ class kraken (Exchange):
 
     async def fetch_min_order_sizes(self):
         html = None
+        oldParseJsonResponse = self.parseJsonResponse
         try:
             self.parseJsonResponse = False
             html = await self.zendeskGet205893708WhatIsTheMinimumOrderSize()
-            self.parseJsonResponse = True
+            self.parseJsonResponse = oldParseJsonResponse
         except Exception as e:
             # ensure parseJsonResponse is restored no matter what
-            self.parseJsonResponse = True
+            self.parseJsonResponse = oldParseJsonResponse
             raise e
         parts = html.split('ul>')
         ul = parts[1]
@@ -579,7 +582,7 @@ class kraken (Exchange):
 
     async def fetch_balance(self, params={}):
         await self.load_markets()
-        response = await self.privatePostBalance()
+        response = await self.privatePostBalance(params)
         balances = self.safe_value(response, 'result')
         if balances is None:
             raise ExchangeNotAvailable(self.id + ' fetchBalance failed due to a malformed response ' + self.json(response))
